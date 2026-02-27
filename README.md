@@ -1,6 +1,6 @@
 # Railway Crossing Model Checking Example
 
-This is a simple example demonstrating formal verification using model checking for a railway safety-critical system.
+A simple example demonstrating formal verification using model checking for a railway safety-critical system.
 
 ## Problem Description
 
@@ -11,20 +11,22 @@ A train approaches a railway crossing with a gate. The system must ensure:
 ## Model Components
 
 ### States
-- **Train positions**: FAR → NEAR → CROSSING → GONE
-- **Gate states**: OPEN → CLOSING → CLOSED → OPENING
+
+- **Train positions**: FAR → NEAR → CROSSING → GONE (cyclic)
+- **Gate states**: OPEN ↔ CLOSED
 
 ### Processes
+
 1. **Train**: Moves through positions, waits for gate to close before crossing
 2. **GateController**: Opens and closes the gate based on train position
 
 ### Properties to Verify
 
-1. **Safety (LTL)**: `[] (train_position == CROSSING -> gate_state == CLOSED)`
+1. **Safety (LTL)**: `[] ((train_position == CROSSING) -> (gate_state == CLOSED))`
    - "Always, if the train is crossing, then the gate is closed"
    - This prevents accidents
 
-2. **Liveness (LTL)**: `[] (train_position == NEAR -> <> train_position == GONE)`
+2. **Liveness (LTL)**: `[] ((train_position == NEAR) -> (<>(train_position == GONE)))`
    - "Always, if the train is near, eventually it will be gone"
    - This prevents deadlock/starvation
 
@@ -49,37 +51,41 @@ spin -a railway_crossing.pml
 # Compile
 gcc -o pan pan.c
 
-# Run verification
-./pan -a
-
-# Check for deadlocks
-./pan -l
-
-# Check specific LTL property
+# Verify safety property (no errors expected)
 ./pan -a -N safety
+
+# Verify liveness/progress property (no errors expected)
 ./pan -a -N progress
 ```
 
 ## Expected Results
 
-✅ The model should verify successfully:
+The model should verify successfully:
 - No safety violations (train never crosses with gate open)
 - No deadlocks
 - Progress property holds
 
-## Learning Points
+## Key Promela Concepts
 
-1. **Concurrency**: Two processes running simultaneously
-2. **Synchronization**: Train waits for gate to close
-3. **Temporal Logic**: LTL formulas express safety and liveness
-4. **Exhaustive Search**: SPIN explores all possible execution paths
+1. **Atomicity matters**: In Promela, a guard (`:: cond ->`) and its body are
+   separate steps - other processes can interleave between them. Use `atomic { }`
+   to wrap guard + body when you need them to execute without interruption.
 
-## Potential Issues to Explore
+2. **LTL parentheses**: Temporal operators like `<>` bind tightly.
+   Write `<>(expr)` not `<> expr`, otherwise SPIN may misparse the formula.
+
+3. **Concurrency**: Two `active proctype` processes run with arbitrary interleaving.
+   SPIN exhaustively explores all possible schedules.
+
+4. **Exhaustive search**: Unlike testing, model checking verifies *every* reachable
+   state - if a bug exists in any execution path, SPIN will find it.
+
+## Experiments
 
 Try modifying the model to introduce bugs:
-- Remove the wait condition `(gate_state == CLOSED)` in the Train process
-- Change the gate controller logic
-- Add sensor failures or delays
+- Remove the `atomic` wrapper from a transition - SPIN will find the race condition
+- Remove the `gate_state == CLOSED` guard from the Train - the safety property will fail
+- Change the gate opening condition - watch for deadlocks
 
 The model checker will detect these violations!
 
@@ -90,4 +96,4 @@ The model checker will detect these violations!
   - `[]` = "always" (globally)
   - `<>` = "eventually" (finally)
   - `->` = "implies"
-- Real railway systems use similar formal methods for safety certification
+- Real railway systems (e.g. ERTMS/ETCS) use similar formal methods for safety certification

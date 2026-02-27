@@ -4,19 +4,24 @@
  * 
  * System: A simple railway crossing with a train and a gate
  * Safety Property: The gate must be closed when the train crosses
+ *
+ * Key Promela notes:
+ *   - In a do-loop, the guard (:: cond ->) and body are separate steps;
+ *     other processes CAN interleave between them.
+ *   - Wrapping guard + body in atomic { } prevents interleaving.
+ *   - LTL temporal operators need explicit parentheses around their
+ *     operand, e.g. <>(expr), not <> expr.
  */
 
 // Train states
-#define FAR     0
-#define NEAR    1
+#define FAR      0
+#define NEAR     1
 #define CROSSING 2
-#define GONE    3
+#define GONE     3
 
 // Gate states
-#define OPEN    0
-#define CLOSING 1
-#define CLOSED  2
-#define OPENING 3
+#define OPEN     0
+#define CLOSED   1
 
 byte train_position = FAR;
 byte gate_state = OPEN;
@@ -24,53 +29,51 @@ byte gate_state = OPEN;
 // Train process
 active proctype Train() {
     do
-    :: train_position == FAR ->
+    :: atomic { train_position == FAR ->
         printf("Train: Approaching (FAR -> NEAR)\n");
-        train_position = NEAR;
-        
-    :: train_position == NEAR ->
-        // Wait for gate to be closed before crossing
-        (gate_state == CLOSED);
+        train_position = NEAR
+       }
+
+    :: atomic { train_position == NEAR && gate_state == CLOSED ->
         printf("Train: Entering crossing (NEAR -> CROSSING)\n");
-        train_position = CROSSING;
-        
-    :: train_position == CROSSING ->
+        train_position = CROSSING
+       }
+
+    :: atomic { train_position == CROSSING ->
         printf("Train: Passed crossing (CROSSING -> GONE)\n");
-        train_position = GONE;
-        
-    :: train_position == GONE ->
+        train_position = GONE
+       }
+
+    :: atomic { train_position == GONE ->
         printf("Train: Reset (GONE -> FAR)\n");
-        train_position = FAR;
+        train_position = FAR
+       }
     od
 }
 
 // Gate controller process
+// Gate closes when train is NEAR; opens only when train has left
+// (GONE or FAR) and is definitely not on the crossing.
 active proctype GateController() {
     do
-    :: train_position == NEAR && gate_state == OPEN ->
-        printf("Gate: Start closing\n");
-        gate_state = CLOSING;
-        
-    :: gate_state == CLOSING ->
-        printf("Gate: Now closed\n");
-        gate_state = CLOSED;
-        
-    :: train_position == GONE && gate_state == CLOSED ->
-        printf("Gate: Start opening\n");
-        gate_state = OPENING;
-        
-    :: gate_state == OPENING ->
-        printf("Gate: Now open\n");
-        gate_state = OPEN;
+    :: atomic { train_position == NEAR && gate_state == OPEN ->
+        printf("Gate: Closing\n");
+        gate_state = CLOSED
+       }
+
+    :: atomic { (train_position == GONE || train_position == FAR) && gate_state == CLOSED ->
+        printf("Gate: Opening\n");
+        gate_state = OPEN
+       }
     od
 }
 
 // SAFETY PROPERTY: Train must never be crossing when gate is not closed
 ltl safety {
-    [] (train_position == CROSSING -> gate_state == CLOSED)
+    [] ((train_position == CROSSING) -> (gate_state == CLOSED))
 }
 
-// LIVENESS PROPERTY: Train will eventually pass the crossing
+// LIVENESS PROPERTY: Whenever the train is near, it eventually passes
 ltl progress {
-    [] (train_position == NEAR -> <> train_position == GONE)
+    [] ((train_position == NEAR) -> (<>(train_position == GONE)))
 }
