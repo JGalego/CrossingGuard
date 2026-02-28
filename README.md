@@ -2,6 +2,8 @@
 
 A simple example demonstrating formal verification using model checking for a railway safety-critical system.
 
+![](train.gif)
+
 ## Problem Description
 
 A train approaches a railway crossing with a gate. The system must ensure:
