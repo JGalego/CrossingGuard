@@ -4,6 +4,18 @@ A railway crossing modeled in multiple formal verification tools to demonstrate 
 
 ![](train.gif)
 
+## Table of Contents
+
+- [Problem Description](#problem-description)
+- [Model Components](#model-components)
+- [Project Structure](#project-structure)
+- [Models](#models)
+- [Verified Implementations](#verified-implementations)
+- [Tool Comparison](#tool-comparison)
+- [Key Concepts by Tool](#key-concepts-by-tool)
+- [Experiments](#experiments)
+- [Further Reading](#further-reading)
+
 ## Problem Description
 
 A train approaches a railway crossing with a gate. The system must ensure:
