@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.6//EN'
+  'http://www.it.uu.se/research/group/darts/uppaal/flat-1_6.dtd'>
+<!--
+  Railway Crossing Model Checking Example
+  Using UPPAAL (real-time model checker)
+
+  Same system as the Promela / NuSMV / TLA+ versions, but now with CLOCKS.
+  UPPAAL models timed automata — each transition can have clock guards
+  and resets. This lets us express real-time constraints:
+    - The gate must close within 5 time units of the train being near
+    - The train crosses within 3 time units once the gate is closed
+
+  Properties are expressed in UPPAAL's subset of TCTL.
+-->
+<nta>
+  <declaration>
+// Global declarations
+
+// Train position (shared so the gate can observe it)
+// 0 = far, 1 = near, 2 = crossing, 3 = gone
+int train_position = 0;
+
+// Gate state
+// 0 = open, 1 = closed
+int gate_state = 0;
+
+// Synchronization channels
+chan approach;   // train signals it is approaching
+chan cleared;    // train signals it has passed
+  </declaration>
+
+  <!-- ============================================================ -->
+  <!-- Train automaton                                                -->
+  <!-- ============================================================ -->
+  <template>
+    <name>Train</name>
+    <declaration>
+clock x;  // local clock for timing constraints
+    </declaration>
+
+    <!-- Locations -->
+    <location id="far"      x="0"   y="0">
+      <name x="-10" y="-30">Far</name>
+    </location>
+    <location id="near"     x="200" y="0">
+      <name x="190" y="-30">Near</name>
+      <label kind="invariant" x="190" y="15">x &lt;= 10</label>
+    </location>
+    <location id="crossing" x="400" y="0">
+      <name x="390" y="-30">Crossing</name>
+      <label kind="invariant" x="390" y="15">x &lt;= 3</label>
+    </location>
+    <location id="gone"     x="600" y="0">
+      <name x="590" y="-30">Gone</name>
+    </location>
+
+    <init ref="far"/>
+
+    <!-- Transitions -->
+    <!-- FAR -> NEAR: train approaches, reset clock -->
+    <transition>
+      <source ref="far"/>
+      <target ref="near"/>
+      <label kind="synchronisation" x="80" y="-30">approach!</label>
+      <label kind="assignment" x="80" y="15">train_position = 1, x = 0</label>
+    </transition>
+
+    <!-- NEAR -> CROSSING: gate must be closed, within 10 time units -->
+    <transition>
+      <source ref="near"/>
+      <target ref="crossing"/>
+      <label kind="guard" x="280" y="-30">gate_state == 1</label>
+      <label kind="assignment" x="280" y="15">train_position = 2, x = 0</label>
+    </transition>
+
+    <!-- CROSSING -> GONE: train passes within 3 time units -->
+    <transition>
+      <source ref="crossing"/>
+      <target ref="gone"/>
+      <label kind="synchronisation" x="480" y="-30">cleared!</label>
+      <label kind="assignment" x="480" y="15">train_position = 3</label>
+    </transition>
+
+    <!-- GONE -> FAR: reset -->
+    <transition>
+      <source ref="gone"/>
+      <target ref="far"/>
+      <label kind="assignment" x="300" y="80">train_position = 0</label>
+      <nail x="600" y="100"/>
+      <nail x="0"   y="100"/>
+    </transition>
+  </template>
+
+  <!-- ============================================================ -->
+  <!-- Gate Controller automaton                                      -->
+  <!-- ============================================================ -->
+  <template>
+    <name>GateController</name>
+    <declaration>
+clock y;  // local clock for gate response time
+    </declaration>
+
+    <!-- Locations -->
+    <location id="gopen"   x="0"   y="0">
+      <name x="-10" y="-30">Open</name>
+    </location>
+    <location id="gclosed" x="200" y="0">
+      <name x="190" y="-30">Closed</name>
+    </location>
+
+    <init ref="gopen"/>
+
+    <!-- Transitions -->
+    <!-- OPEN -> CLOSED: triggered by train approach, must close within 5 t.u. -->
+    <transition>
+      <source ref="gopen"/>
+      <target ref="gclosed"/>
+      <label kind="synchronisation" x="80" y="-30">approach?</label>
+      <label kind="guard" x="80" y="-50">y &lt;= 5</label>
+      <label kind="assignment" x="80" y="15">gate_state = 1, y = 0</label>
+    </transition>
+
+    <!-- CLOSED -> OPEN: triggered when train has cleared -->
+    <transition>
+      <source ref="gclosed"/>
+      <target ref="gopen"/>
+      <label kind="synchronisation" x="80" y="60">cleared?</label>
+      <label kind="assignment" x="80" y="80">gate_state = 0, y = 0</label>
+    </transition>
+  </template>
+
+  <!-- ============================================================ -->
+  <!-- System declaration                                             -->
+  <!-- ============================================================ -->
+  <system>
+train = Train();
+gate  = GateController();
+
+system train, gate;
+  </system>
+
+  <!-- ============================================================ -->
+  <!-- Queries (TCTL properties, typically saved in a .q file)        -->
+  <!-- ============================================================ -->
+  <!--
+    UPPAAL uses a restricted TCTL query language:
+
+    Safety:
+      A[] (train.Crossing imply gate_state == 1)
+      "For all paths, always: if train is crossing, gate is closed"
+
+    Liveness:
+      A<> (train.Gone)
+      "For all paths, eventually: the train reaches Gone"
+
+    Reachability:
+      E<> (train.Crossing)
+      "There exists a path where the train reaches Crossing"
+
+    Deadlock freedom:
+      A[] not deadlock
+      "The system is deadlock-free"
+
+    Real-time bounded response:
+      A[] (train.Near imply train.x <= 10)
+      "The train never waits more than 10 time units at Near"
+      (This is enforced by the location invariant)
+  -->
+</nta>

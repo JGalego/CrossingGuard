@@ -1,0 +1,66 @@
+-- Railway Crossing Model Checking Example
+-- Using NuSMV (symbolic model checker)
+--
+-- Same system as the Promela version:
+--   - A train approaches a crossing with a gate
+--   - Safety: gate must be closed when train crosses
+--   - Liveness: train eventually passes through
+--
+-- NuSMV uses CTL and LTL, and models systems as
+-- synchronous finite-state machines.
+
+MODULE main
+
+VAR
+    train_position : { far, near, crossing, gone };
+    gate_state     : { open, closed };
+
+ASSIGN
+    -- Initial states
+    init(train_position) := far;
+    init(gate_state)     := open;
+
+    -- Train transitions
+    next(train_position) := case
+        train_position = far                          : near;
+        train_position = near & gate_state = closed   : crossing;
+        train_position = crossing                     : gone;
+        train_position = gone                         : far;
+        TRUE                                          : train_position;
+    esac;
+
+    -- Gate transitions
+    next(gate_state) := case
+        train_position = near & gate_state = open     : closed;
+        (train_position = gone | train_position = far)
+            & gate_state = closed                     : open;
+        TRUE                                          : gate_state;
+    esac;
+
+-- ============================================================
+-- CTL Properties (branching-time logic, native to NuSMV)
+-- ============================================================
+
+-- Safety: on ALL paths, it is ALWAYS true that
+-- if the train is crossing, the gate is closed
+CTLSPEC AG (train_position = crossing -> gate_state = closed)
+
+-- Liveness: on ALL paths, whenever the train is near,
+-- there EXISTS a future state where it is gone
+CTLSPEC AG (train_position = near -> AF train_position = gone)
+
+-- Reachability: it is possible for the train to cross
+CTLSPEC EF (train_position = crossing)
+
+-- No deadlock: the system can always make progress
+CTLSPEC AG EF (train_position = far)
+
+-- ============================================================
+-- LTL Properties (linear-time logic, also supported)
+-- ============================================================
+
+-- Safety (LTL equivalent of the CTL property above)
+LTLSPEC G (train_position = crossing -> gate_state = closed)
+
+-- Liveness (LTL equivalent)
+LTLSPEC G (train_position = near -> F train_position = gone)

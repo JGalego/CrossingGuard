@@ -1,3 +1,7 @@
+# SPIN (Promela)
 pan*
 _spin_nvr.tmp
 *.trail
+
+# TLA+
+tla2tools.jar
