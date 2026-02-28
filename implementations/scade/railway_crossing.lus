@@ -1,0 +1,65 @@
+-- Railway Crossing — SCADE / Lustre textual model
+--
+-- SCADE is built on the synchronous dataflow language Lustre.
+-- This file is a textual Lustre representation that can be imported
+-- into SCADE Suite or verified with the Lustre V6 compiler / Kind 2.
+--
+-- Inputs:
+--   train_sensor : bool  (true when a train is detected approaching)
+--
+-- Outputs:
+--   gate_cmd     : bool  (true = gate closed, false = gate open)
+--   safe         : bool  (safety property: gate closed when train crossing)
+--
+-- The node implements a Mealy machine with 4 train positions
+-- (Far, Near, Crossing, Gone) modelled as an integer counter 0..3.
+
+node RailwayCrossing (train_sensor : bool) returns (gate_cmd : bool; safe : bool);
+var
+  train_pos : int;   -- 0=Far, 1=Near, 2=Crossing, 3=Gone
+  gate      : bool;  -- true=closed, false=open
+let
+  -----------------------------------------------------------------
+  -- Train position: advances 0 → 1 → 2 → 3 → 0 each cycle the
+  -- sensor fires, otherwise stays put.
+  -----------------------------------------------------------------
+  train_pos = 0 -> if (pre train_pos = 3) then 0
+                   else if train_sensor then pre train_pos + 1
+                   else pre train_pos;
+
+  -----------------------------------------------------------------
+  -- Gate logic:
+  --   Close when train is Near or Crossing (positions 1, 2)
+  --   Open  otherwise (Far=0, Gone=3)
+  -----------------------------------------------------------------
+  gate = (train_pos = 1) or (train_pos = 2);
+
+  -----------------------------------------------------------------
+  -- Outputs
+  -----------------------------------------------------------------
+  gate_cmd = gate;
+
+  -----------------------------------------------------------------
+  -- Safety property: whenever the train is on the crossing (pos 2)
+  -- the gate must be closed.
+  -----------------------------------------------------------------
+  safe = (train_pos = 2) => gate;
+
+tel
+
+-----------------------------------------------------------------
+-- Observer node for model checking (Kind 2 / Lesar)
+--
+--   kind2 railway_crossing.lus --main Observer
+--
+-- The observer asserts the safety property for all reachable states.
+-----------------------------------------------------------------
+node Observer (train_sensor : bool) returns (OK : bool);
+var
+  gate_cmd : bool;
+  safe     : bool;
+let
+  (gate_cmd, safe) = RailwayCrossing(train_sensor);
+  OK = safe;
+  --%PROPERTY OK;
+tel

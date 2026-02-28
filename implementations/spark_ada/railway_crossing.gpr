@@ -1,0 +1,13 @@
+project Railway_Crossing is
+   for Source_Dirs use (".");
+   for Main use ("main.adb");
+   for Object_Dir use "obj";
+
+   package Prove is
+      for Proof_Switches ("Ada") use ("--level=2", "--mode=all");
+   end Prove;
+
+   package Compiler is
+      for Default_Switches ("Ada") use ("-gnata", "-gnatwa", "-g");
+   end Compiler;
+end Railway_Crossing;

@@ -5,3 +5,15 @@ _spin_nvr.tmp
 
 # TLA+
 tla2tools.jar
+
+# Dafny build artifacts
+implementations/dafny/obj/
+implementations/dafny/*.cs
+implementations/dafny/*.csproj
+implementations/dafny/*.dll
+implementations/dafny/*.pdb
+implementations/dafny/*.json
+implementations/dafny/RailwayCrossing
+
+# SPARK Ada build artifacts
+implementations/spark_ada/obj/

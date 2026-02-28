@@ -10,10 +10,10 @@
 #   docker run --rm -v $(pwd):/models -w /models model-checker
 #
 # Examples inside the container:
-#   spin -a railway_crossing.pml && gcc -o pan pan.c && ./pan -a -N safety
-#   NuSMV railway_crossing.smv
-#   java -jar $TLA2TOOLS RailwayCrossing.tla
-#   verifyta railway_crossing.xml railway_crossing.q
+#   spin -a models/spin/railway_crossing.pml && gcc -o pan pan.c && ./pan -a -N safety
+#   NuSMV models/nusmv/railway_crossing.smv
+#   cd models/tlaplus && tlc -config RailwayCrossing.cfg RailwayCrossing.tla
+#   verifyta models/uppaal/railway_crossing.xml models/uppaal/railway_crossing.q
 # =============================================================
 
 FROM ubuntu:24.04
