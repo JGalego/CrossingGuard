@@ -13,6 +13,12 @@
 --
 -- The node implements a Mealy machine with 4 train positions
 -- (Far, Near, Crossing, Gone) modelled as an integer counter 0..3.
+--
+-- Transitions (matching all other models):
+--   FAR(0) → NEAR(1)     : when train_sensor fires
+--   NEAR(1) → CROSSING(2): when gate is closed (gate = true)
+--   CROSSING(2) → GONE(3): unconditionally (train passes)
+--   GONE(3) → FAR(0)     : when train_sensor fires (explicit reset)
 
 node RailwayCrossing (train_sensor : bool) returns (gate_cmd : bool; safe : bool);
 var
@@ -20,19 +26,25 @@ var
   gate      : bool;  -- true=closed, false=open
 let
   -----------------------------------------------------------------
-  -- Train position: advances 0 → 1 → 2 → 3 → 0 each cycle the
-  -- sensor fires, otherwise stays put.
-  -----------------------------------------------------------------
-  train_pos = 0 -> if (pre train_pos = 3) then 0
-                   else if train_sensor then pre train_pos + 1
-                   else pre train_pos;
-
-  -----------------------------------------------------------------
   -- Gate logic:
   --   Close when train is Near or Crossing (positions 1, 2)
   --   Open  otherwise (Far=0, Gone=3)
   -----------------------------------------------------------------
   gate = (train_pos = 1) or (train_pos = 2);
+
+  -----------------------------------------------------------------
+  -- Train position:
+  --   FAR  → NEAR     : sensor fires
+  --   NEAR → CROSSING : gate is closed (safety guard, uses pre gate
+  --                      to break the dependency cycle within a tick)
+  --   CROSSING → GONE : always (train passes through)
+  --   GONE → FAR      : sensor fires (explicit reset)
+  -----------------------------------------------------------------
+  train_pos = 0 -> if (pre train_pos = 0) and train_sensor then 1
+                   else if (pre train_pos = 1) and (pre gate) then 2
+                   else if (pre train_pos = 2) then 3
+                   else if (pre train_pos = 3) and train_sensor then 0
+                   else pre train_pos;
 
   -----------------------------------------------------------------
   -- Outputs

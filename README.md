@@ -8,6 +8,13 @@ A railway crossing modeled in multiple formal verification tools to demonstrate 
 
 - [Problem Description](#problem-description)
 - [Model Components](#model-components)
+  - [States](#states)
+  - [State Machines](#state-machines)
+    - [Train](#train)
+    - [Gate Controller](#gate-controller)
+    - [System Interaction](#system-interaction)
+  - [Processes](#processes)
+  - [Properties to Verify](#properties-to-verify)
 - [Project Structure](#project-structure)
 - [Models](#models)
 - [Verified Implementations](#verified-implementations)
@@ -29,6 +36,51 @@ A train approaches a railway crossing with a gate. The system must ensure:
 
 - **Train positions**: FAR → NEAR → CROSSING → GONE (cyclic)
 - **Gate states**: OPEN ↔ CLOSED
+
+### State Machines
+
+#### Train
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> FAR
+    FAR --> NEAR : approach
+    NEAR --> CROSSING : enter [gate = CLOSED]
+    CROSSING --> GONE : pass
+    GONE --> FAR : reset
+```
+
+#### Gate Controller
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> OPEN
+    OPEN --> CLOSED : close [train = NEAR]
+    CLOSED --> OPEN : open [train ∈ {GONE, FAR}]
+```
+
+#### System Interaction
+
+```mermaid
+sequenceDiagram
+    participant T as Train
+    participant G as Gate Controller
+
+    Note over T: FAR
+    T->>T: approach → NEAR
+    T->>G: train is NEAR
+    G->>G: close gate → CLOSED
+    Note over G: CLOSED
+    T->>T: enter → CROSSING
+    Note over T: ⚠️ Safety: gate MUST be CLOSED here
+    T->>T: pass → GONE
+    T->>G: train is GONE
+    G->>G: open gate → OPEN
+    Note over G: OPEN
+    T->>T: reset → FAR
+```
 
 ### Processes
 
@@ -159,7 +211,7 @@ proves at compile time that the safety property is maintained across all transit
 # Option 1: Install GNAT + SPARK
 # Download GNAT Community Edition: https://www.adacore.com/community
 # (includes gprbuild, gnatprove, and the SPARK toolset)
-# Or via Alire: https://alire.ada.dev/
+# Or via Alire: https://alire.ada.dev/ (preferred)
 
 # Prove contracts (formal verification — no execution needed)
 cd implementations/spark_ada
@@ -255,7 +307,7 @@ certified C/Ada code from this specification.
 
 - Synchronous dataflow: every variable has a value at every tick
 - `pre` operator references the previous cycle's value
-- `->` operator initializes the first tick (like Lustre's `fby`)
+- `->` operator initializes the first tick (`init -> rest` uses `init` at tick 0, `rest` thereafter)
 - `--%PROPERTY` annotations define properties for Kind 2
 
 ## Experiments
